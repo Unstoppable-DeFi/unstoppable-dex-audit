@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "margin-dex"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+packages = [{include = "margin_dex"}]
+
+[tool.poetry.dependencies]
+python = "~3.10"
+vyper = "^0.3.9"
+pytest-watch = "^4.2.0"
+pytest-only = "^2.0.0"
+titanoboa = "^0.1.7"
+pytest = "^7.3.2"
+pipenv = "^2023.6.18"
+black = "^23.3.0"
+
+
+[tool.poetry.group.dev.dependencies]
+blackadder = "^0.1.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+filterwarnings = [ "ignore::DeprecationWarning" ]

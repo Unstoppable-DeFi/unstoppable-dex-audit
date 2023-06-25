@@ -1,0 +1,8 @@
+__pycache__
+
+secrets*
+node_modules
+.envrc
+
+.DS_Store
+tags
