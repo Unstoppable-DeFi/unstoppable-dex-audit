@@ -351,9 +351,12 @@ def liquidate(_position_uid: bytes32):
         Charges the account a liquidation penalty.
     """
     assert self.is_whitelisted_dex[msg.sender], "unauthorized"
+    
+    position: Position = self.positions[_position_uid]
+    
+    self._update_debt(position.debt_token)
     assert self._is_liquidatable(_position_uid), "position not liquidateable"
 
-    position: Position = self.positions[_position_uid]
     debt_amount: uint256 = self._debt(_position_uid)
 
     min_amount_out: uint256 = self._market_order_min_amount_out(
