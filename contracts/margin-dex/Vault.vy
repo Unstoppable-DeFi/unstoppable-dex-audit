@@ -307,7 +307,7 @@ def reduce_position(
     if min_amount_out == 0:
         # market order, add some slippage protection
         min_amount_out = self._market_order_min_amount_out(
-            position.position_token, position.debt_token, position.position_amount
+            position.position_token, position.debt_token, _reduce_by_amount
         )
 
     debt_amount: uint256 = self._debt(_position_uid)
