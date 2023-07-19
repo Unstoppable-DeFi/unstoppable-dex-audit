@@ -1078,7 +1078,7 @@ def _debt_interest_since_last_update(_debt_token: address) -> uint256:
         (block.timestamp - self.last_debt_update[_debt_token])
         * self._current_interest_per_second(_debt_token)
         * self.total_debt_amount[_debt_token]
-        / PERCENTAGE_BASE
+        / PERCENTAGE_BASE_HIGH_PRECISION
         / PRECISION
     )
 
