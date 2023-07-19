@@ -324,6 +324,7 @@ def reduce_position(
     reduce_debt_by_amount: uint256 = amount_out_received - reduce_margin_by_amount
 
     position.margin_amount -= reduce_margin_by_amount
+    self.margin[position.account][position.debt_token] += reduce_margin_by_amount
 
     burnt_debt_shares: uint256 = self._repay(position.debt_token, reduce_debt_by_amount)
     position.debt_shares -= burnt_debt_shares
