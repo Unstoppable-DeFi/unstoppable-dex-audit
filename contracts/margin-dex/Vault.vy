@@ -1061,14 +1061,15 @@ def _update_debt(_debt_token: address):
     if block.timestamp == self.last_debt_update[_debt_token]:
         return  # already up to date, nothing to do
 
-    self.last_debt_update[_debt_token] = block.timestamp
-    
     if self.total_debt_amount[_debt_token] == 0:
+        self.last_debt_update[_debt_token] = block.timestamp
         return # no debt, no interest
 
     self.total_debt_amount[_debt_token] += self._debt_interest_since_last_update(
         _debt_token
     )
+
+    self.last_debt_update[_debt_token] = block.timestamp
 
 @internal
 @view
