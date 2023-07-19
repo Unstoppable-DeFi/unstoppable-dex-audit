@@ -533,6 +533,7 @@ def remove_margin(_position_uid: bytes32, _amount: uint256):
     """
     assert self.is_whitelisted_dex[msg.sender], "unauthorized"
 
+
     position: Position = self.positions[_position_uid]
 
     assert position.margin_amount >= _amount, "not enough margin"
@@ -540,6 +541,7 @@ def remove_margin(_position_uid: bytes32, _amount: uint256):
     position.margin_amount -= _amount
     self.margin[position.account][position.debt_token] += _amount
 
+    self._update_debt(position.debt_token)
     assert not self._is_liquidatable(_position_uid), "exceeds max leverage"
     
     self.positions[_position_uid] = position
