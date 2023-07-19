@@ -134,7 +134,7 @@ def test_reduce_position_partially_reduces_debt(vault, usdc, weth, owner):
     # we have a margin of 15 and a debt of 150, the margin to debt ratio is
     # 15/165 = 0.0909.. accordingly we are reducing the margin by 0.45
     # and the debt by 4.55
-    expected_debt_shares = 145500000000000000000000000
+    expected_debt_shares = 145454545000000000000000000
     assert debt_shares_after_reduce == expected_debt_shares
 
 

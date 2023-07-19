@@ -311,7 +311,7 @@ def reduce_position(
         )
 
     debt_amount: uint256 = self._debt(_position_uid)
-    margin_debt_ratio: uint256 = position.margin_amount * PRECISION / debt_amount
+    margin_debt_ratio: uint256 = position.margin_amount * PRECISION / (debt_amount + position.margin_amount)
 
     amount_out_received: uint256 = self._swap(
         position.position_token, position.debt_token, _reduce_by_amount, min_amount_out
