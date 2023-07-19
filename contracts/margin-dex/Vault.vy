@@ -1591,6 +1591,9 @@ def set_variable_interest_parameters(
     _rate_switch_utilization: uint256,
 ):
     assert msg.sender == self.admin, "unauthorized"
+
+    self._update_debt(_address)
+    
     self.interest_configuration[_address] = [
         _min_interest_rate,
         _mid_interest_rate,
