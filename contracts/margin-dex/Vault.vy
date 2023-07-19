@@ -119,6 +119,7 @@ last_debt_update: public(HashMap[address, uint256])
 
 # token -> bad_debt
 bad_debt: public(HashMap[address, uint256])
+acceptable_amount_of_bad_debt: public(HashMap[address, uint256])
 
 # dynamic interest rates [min, mid, max, kink]
 interest_configuration: HashMap[address, uint256[4]]
@@ -263,9 +264,12 @@ def _close_position(_position_uid: bytes32, _min_amount_out: uint256) -> uint256
         self._repay(position.debt_token, position_debt_amount)
     else:
         # edge case: bad debt
-        self.is_accepting_new_orders = False  # put protocol in defensive mode
         bad_debt: uint256 = position_debt_amount - amount_out_received
         self.bad_debt[position.debt_token] += bad_debt
+        
+        if self.bad_debt[position.debt_token] > self.acceptable_amount_of_bad_debt[position.debt_token]:
+            self.is_accepting_new_orders = False  # put protocol in defensive mode
+
         self._repay(
             position.debt_token, amount_out_received
         )  # repay LPs as much as possible
@@ -1522,6 +1526,12 @@ def set_liquidate_slippage_for_market(
 ):
     assert msg.sender == self.admin, "unauthorized"
     self.liquidate_slippage[_token1][_token2] = _slippage
+
+
+@external
+def set_acceptable_amount_of_bad_debt(_address: address, _amount: uint256):
+    assert msg.sender == self.admin, "unauthorized"
+    self.acceptable_amount_of_bad_debt[_address] = _amount
 
 
 #
