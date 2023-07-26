@@ -66,9 +66,9 @@ def dex():
 @pytest.fixture(scope="session", autouse=True)
 def vault(eth_usd_oracle, usdc_usd_oracle, wbtc_usd_oracle):
     vault = boa.load("contracts/margin-dex/Vault.vy")
-    vault.whitelist_token(pytest.WETH, pytest.ETH_USD_ORACLE)
-    vault.whitelist_token(pytest.USDC, pytest.USDC_USD_ORACLE)
-    vault.whitelist_token(pytest.WBTC, pytest.WBTC_USD_ORACLE)
+    vault.whitelist_token(pytest.WETH, pytest.ETH_USD_ORACLE, 60*60*24)
+    vault.whitelist_token(pytest.USDC, pytest.USDC_USD_ORACLE, 60*60*24)
+    vault.whitelist_token(pytest.WBTC, pytest.WBTC_USD_ORACLE, 60*60*24)
     vault.enable_market(pytest.WETH, pytest.USDC, 50)
     vault.enable_market(pytest.USDC, pytest.WETH, 50)
     vault.set_variable_interest_parameters(pytest.WETH, 0, 0, 0, 80_00_000)
