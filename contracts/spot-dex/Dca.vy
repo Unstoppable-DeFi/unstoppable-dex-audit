@@ -197,11 +197,16 @@ def execute_dca_order(_uid: bytes32, _uni_hop_path: DynArray[address, 3], _uni_p
         self._cancel_dca_order(_uid, "insufficient allowance")
         return
 
+
+    balance_before: uint256 = ERC20(order.token_in).balanceOf(self)
+    
     # transfer token_in from user to self
     self._safe_transfer_from(order.token_in, order.account, self, order.amount_in_per_execution)
 
-    # approve UNISWAP_ROUTER to spend amount token_in
-    ERC20(order.token_in).approve(UNISWAP_ROUTER, order.amount_in_per_execution)
+    execution_amount: uint256 = ERC20(order.token_in).balanceOf(self) - balance_before
+
+    # approve UNISWAP_ROUTER to spend token_in
+    ERC20(order.token_in).approve(UNISWAP_ROUTER, execution_amount)
 
     # Vyper way to accommodate abi.encode_packed
     path: Bytes[66] = empty(Bytes[66])
@@ -210,13 +215,13 @@ def execute_dca_order(_uid: bytes32, _uni_hop_path: DynArray[address, 3], _uni_p
     elif(len(_uni_hop_path) == 3):
         path = concat(convert(_uni_hop_path[0], bytes20), convert(_uni_pool_fees[0], bytes3), convert(_uni_hop_path[1], bytes20), convert(_uni_pool_fees[1], bytes3), convert(_uni_hop_path[2], bytes20))
     
-    min_amount_out: uint256 = self._calc_min_amount_out(order.amount_in_per_execution, _uni_hop_path, _uni_pool_fees, order.twap_length, order.max_slippage)
+    min_amount_out: uint256 = self._calc_min_amount_out(execution_amount, _uni_hop_path, _uni_pool_fees, order.twap_length, order.max_slippage)
 
     uni_params: ExactInputParams = ExactInputParams({
         path: path,
         recipient: self,
         deadline: block.timestamp,
-        amountIn: order.amount_in_per_execution,
+        amountIn: execution_amount,
         amountOutMinimum: min_amount_out
     })
     amount_out: uint256 = UniswapV3SwapRouter(UNISWAP_ROUTER).exactInput(uni_params)

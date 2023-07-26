@@ -157,11 +157,15 @@ def execute_limit_order(_uid: bytes32, _path: DynArray[address, 3], _uni_pool_fe
     # cleanup storage
     self._cleanup_order(_uid)
 
+    balance_before: uint256 = ERC20(order.token_in).balanceOf(self)
+    
     # transfer token_in from user to self
     self._safe_transfer_from(order.token_in, order.account, self, order.amount_in)
 
-    # approve UNISWAP_ROUTER to spend amount token_in
-    ERC20(order.token_in).approve(UNISWAP_ROUTER, order.amount_in)
+    execution_amount: uint256 = ERC20(order.token_in).balanceOf(self) - balance_before
+
+    # approve UNISWAP_ROUTER to spend token_in
+    ERC20(order.token_in).approve(UNISWAP_ROUTER, execution_amount)
 
     path: Bytes[66] = empty(Bytes[66])
     if(len(_path) == 2):
@@ -174,7 +178,7 @@ def execute_limit_order(_uid: bytes32, _path: DynArray[address, 3], _uni_pool_fe
         path: path,
         recipient: self,
         deadline: block.timestamp,
-        amountIn: order.amount_in,
+        amountIn: execution_amount,
         amountOutMinimum: order.min_amount_out
     })
     amount_out: uint256 = UniswapV3SwapRouter(UNISWAP_ROUTER).exactInput(uni_params)
