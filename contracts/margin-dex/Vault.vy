@@ -52,7 +52,6 @@ PERCENTAGE_BASE: constant(uint256) = 100_00 # == 100%
 PERCENTAGE_BASE_HIGH_PRECISION: constant(uint256) = 100_00_000  # == 100%
 
 ARBITRUM_SEQUENCER_UPTIME_FEED: constant(address) = 0xFdB631F5EE196F0ed6FAa767959853A9F217697D
-ORACLE_FRESHNESS_THRESHOLD: constant(uint256) = 24*60*60 # 24h
 
 WETH: constant(address) = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1
 
@@ -77,6 +76,7 @@ is_enabled_market: HashMap[address, HashMap[address, bool]]
 max_leverage: public(HashMap[address, HashMap[address, uint256]])
 # token -> Chainlink oracle
 to_usd_oracle: public(HashMap[address, address])
+oracle_freshness_threshold: public(HashMap[address, uint256])
 # token_in -> # token_out -> slippage
 liquidate_slippage: public(HashMap[address, HashMap[address, uint256]])
 
@@ -587,7 +587,7 @@ def _to_usd_oracle_price(_token: address) -> uint256:
         self.to_usd_oracle[_token]
     ).latestRoundData()
 
-    assert (block.timestamp - updated_at) < ORACLE_FRESHNESS_THRESHOLD, "oracle not fresh"
+    assert (block.timestamp - updated_at) < self.oracle_freshness_threshold[self.to_usd_oracle[_token]], "oracle not fresh"
 
     usd_price: uint256 = convert(answer, uint256)  # 8 dec
     return usd_price
@@ -1486,12 +1486,17 @@ def set_is_accepting_new_orders(_is_accepting_new_orders: bool):
 # allowed tokens & markets
 #
 @external
-def whitelist_token(_token: address, _token_to_usd_oracle: address) -> uint256:
+def whitelist_token(
+    _token: address, 
+    _token_to_usd_oracle: address, 
+    _oracle_freshness_threshold: uint256) -> uint256:
     assert msg.sender == self.admin, "unauthorized"
     assert self.is_whitelisted_token[_token] == False, "already whitelisted"
+    assert _oracle_freshness_threshold > 0, "invalid oracle freshness threshold"
 
     self.is_whitelisted_token[_token] = True
     self.to_usd_oracle[_token] = _token_to_usd_oracle
+    self.oracle_freshness_threshold[_token_to_usd_oracle] = _oracle_freshness_threshold
 
     return self._to_usd_oracle_price(_token)
 
