@@ -117,7 +117,7 @@ def test_cannot_remove_too_much_margin(vault, owner, weth, usdc, mock_router, et
 
     eth_usd_oracle.set_answer(910_00000000)
 
-    assert vault.internal._calculate_leverage(910, 900, 10) == 91
+    assert vault.internal._calculate_leverage(910, 900) == 91
     assert vault.max_leverage(weth, usdc) == 50
 
     with boa.reverts("exceeds max leverage"):

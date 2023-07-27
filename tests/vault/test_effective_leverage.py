@@ -12,11 +12,11 @@ def setup(vault, mock_router, owner, usdc, weth):
 
 def test_effective_leverage(vault):
     # _calculate_leverage(_position_value: uint256, _debt_value: uint256, _margin_value: uint256)
-    assert vault.internal._calculate_leverage(1000, 900, 100) == 10
+    assert vault.internal._calculate_leverage(1000, 900) == 10
 
-    assert vault.internal._calculate_leverage(1100, 900, 100) == 5
+    assert vault.internal._calculate_leverage(1100, 900) == 5
 
-    assert vault.internal._calculate_leverage(950, 900, 100) == 20
+    assert vault.internal._calculate_leverage(950, 900) == 19
 
 
 def test_is_liquidatable(vault, weth, usdc, owner, eth_usd_oracle):
@@ -36,15 +36,15 @@ def test_is_liquidatable(vault, weth, usdc, owner, eth_usd_oracle):
     assert not vault.is_liquidatable(uid) 
 
     eth_usd_oracle.set_answer(950_00000000)
-    assert vault.effective_leverage(uid) == 20
-    assert not vault.is_liquidatable(uid) 
-
-    vault.eval(f"self.max_leverage[{usdc.address}][{weth.address}] = 20")
-    assert vault.effective_leverage(uid) == 20
-    assert vault.max_leverage(usdc, weth) == 20
+    assert vault.effective_leverage(uid) == 19
     assert not vault.is_liquidatable(uid) 
 
     vault.eval(f"self.max_leverage[{usdc.address}][{weth.address}] = 19")
+    assert vault.effective_leverage(uid) == 19
     assert vault.max_leverage(usdc, weth) == 19
-    assert vault.effective_leverage(uid) == 20
+    assert not vault.is_liquidatable(uid) 
+
+    vault.eval(f"self.max_leverage[{usdc.address}][{weth.address}] = 18")
+    assert vault.max_leverage(usdc, weth) == 18
+    assert vault.effective_leverage(uid) == 19
     assert vault.is_liquidatable(uid) 

@@ -51,7 +51,7 @@ def test_liquidate_003(vault, owner, alice, weth, usdc, eth_usd_oracle):
     # we have have a margin of 10USDC, borrow 90 and buy for 100 thus
     # our effective leverage is 10 as we have 10 times our margin-value in ETH
     assert vault.effective_leverage(position_uid) == 10
-    eth_usd_oracle.set_answer(1135_0000_0000)
+    eth_usd_oracle.set_answer(1133_0000_0000)
     assert vault.effective_leverage(position_uid) == 51
     vault.liquidate(position_uid)
 
@@ -59,7 +59,7 @@ def test_liquidate_003(vault, owner, alice, weth, usdc, eth_usd_oracle):
 def test_liquidate_004(vault, owner, alice, weth, usdc, eth_usd_oracle):
     """if the position is liquidated the position should be closed"""
     position_uid, _ = open_position(vault, owner, weth, usdc)
-    eth_usd_oracle.set_answer(1135_0000_0000)
+    eth_usd_oracle.set_answer(1133_0000_0000)
 
     # we have have a margin of 10USDC, borrow 90 and buy for 100 thus
     # our effective leverage is 10 as we have 10 times our margin-value in ETH
@@ -94,23 +94,23 @@ def test_liquidate_005(vault, owner, alice, weth, usdc, eth_usd_oracle):
 
     # 10000000 is the margin used for the trade
     assert vault.margin(owner, usdc) == margin_before - 10000000
-    eth_usd_oracle.set_answer(1135_0000_0000)
+    
+    eth_usd_oracle.set_answer(1234_0000_0000)
+    assert vault.effective_leverage(position_uid) == 10
+
+    vault.set_max_leverage_for_market(usdc, weth, 9) # make position liquidatable
 
     vault.liquidate(position_uid)
 
-    # with ETH price of 1135 the pnl for the trader should be
-    # 91015650  from this 9015650 would be transferred to the margin
-    # as we are penalizing with 1% of the debtwe remove 900000 and should have a margin
-    # of 90115650
-
+    # we are penalizing with 1% of the debt 
     penalty_amount = 900000
-    loss = 9884350  # we lost part of the margin
     assert (
         usdc.balanceOf("0x0000000000000000000000000000000000000066")
         == balance_penalty_receiver + penalty_amount
     )
 
-    assert vault.margin(owner, usdc) == margin_before - loss
+    slippage_amount = 1045540
+    assert vault.margin(owner, usdc) == margin_before - penalty_amount - slippage_amount
 
 
 def test_liquidate_007(vault, owner, alice, weth, usdc, eth_usd_oracle):

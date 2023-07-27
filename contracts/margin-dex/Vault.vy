@@ -463,15 +463,14 @@ def _effective_leverage(_position_uid: bytes32) -> uint256:
         position.position_token, position.position_amount
     )
     debt_value: uint256 = self._in_usd(position.debt_token, debt_amount)
-    margin_value: uint256 = self._in_usd(position.debt_token, position.margin_amount)
 
-    return self._calculate_leverage(position_value, debt_value, margin_value)
+    return self._calculate_leverage(position_value, debt_value)
 
 
 @view
 @internal
 def _calculate_leverage(
-    _position_value: uint256, _debt_value: uint256, _margin_value: uint256
+    _position_value: uint256, _debt_value: uint256
 ) -> uint256:
     if _position_value <= _debt_value:
         # bad debt
@@ -479,7 +478,7 @@ def _calculate_leverage(
 
     return (
         PRECISION
-        * (_debt_value + _margin_value)
+        * (_position_value)
         / (_position_value - _debt_value)
         / PRECISION
     )
