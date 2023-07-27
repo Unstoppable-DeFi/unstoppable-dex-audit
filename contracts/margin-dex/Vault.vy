@@ -956,7 +956,7 @@ def _lp_shares_to_amount(
 @view
 def _amount_per_base_lp_share(_token: address) -> uint256:
     return (
-        self.base_lp_total_amount[_token]
+        self._base_lp_total_amount(_token)
         * PRECISION
         * PRECISION
         / self.base_lp_total_shares[_token]
@@ -972,6 +972,16 @@ def _amount_per_safety_module_lp_share(_token: address) -> uint256:
         * PRECISION
         / self.safety_module_lp_total_shares[_token]
     )
+
+
+@internal
+@view
+def _base_lp_total_amount(_token: address) -> uint256:
+    if self.bad_debt[_token] <= self.safety_module_lp_total_amount[_token]:
+        # safety module covers all bad debt, base lp is healthy
+        return self.base_lp_total_amount[_token]
+    # more bad debt than covered by safety module, base lp is impacted as well
+    return self.base_lp_total_amount[_token] + self.safety_module_lp_total_amount[_token] - self.bad_debt[_token]
 
 
 @internal
