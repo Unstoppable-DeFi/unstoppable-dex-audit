@@ -47,3 +47,31 @@ def test_repay_bad_debt_001(vault, usdc, weth, owner):
     assert bad_debt_after_repaying == 0
 
     assert vault.available_liquidity(usdc) == 999700000002 + bad_debt_after 
+
+
+def test_base_lp_is_impacted_by_bad_debt_if_safety_module_doesnt_cover_it_all(vault, usdc, weth, owner):
+    safety_module_amount = 50_000_0000000
+    base_lp_amount = 100_000_0000000
+    vault.provide_liquidity(usdc, safety_module_amount, True)
+
+    assert vault.bad_debt(usdc) == 0
+    assert vault.safety_module_lp_total_amount(usdc) == safety_module_amount
+    assert vault.base_lp_total_amount(usdc) == base_lp_amount
+
+    base_lp_value_before = vault.lp_shares_to_amount(usdc, 1 * 10**36, False)
+    safety_module_lp_value_before = vault.lp_shares_to_amount(usdc, 1 * 10**36, True)
+
+    vault.eval(f"self.bad_debt[{usdc.address}] = {int(safety_module_amount/2)}")
+
+    assert vault.lp_shares_to_amount(usdc, 1 * 10**36, True) == safety_module_lp_value_before/2
+    assert vault.lp_shares_to_amount(usdc, 1 * 10**36, False) == base_lp_value_before
+
+    vault.eval(f"self.bad_debt[{usdc.address}] = {safety_module_amount}")
+
+    assert vault.lp_shares_to_amount(usdc, 1 * 10**36, True) == 0
+    assert vault.lp_shares_to_amount(usdc, 1 * 10**36, False) == base_lp_value_before
+    
+    vault.eval(f"self.bad_debt[{usdc.address}] = {safety_module_amount + int(base_lp_amount/2)}")
+    
+    assert vault.lp_shares_to_amount(usdc, 1 * 10**36, True) == 0
+    assert vault.lp_shares_to_amount(usdc, 1 * 10**36, False) == base_lp_value_before/2
