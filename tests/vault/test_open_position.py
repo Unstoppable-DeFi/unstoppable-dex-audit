@@ -139,9 +139,9 @@ def test_open_trade_swaps_liquidity_for_underlying(vault, owner, weth, usdc):
     liquidity_before = usdc.balanceOf(vault)
     underlying_before = weth.balanceOf(vault)
 
-    margin_amount = 15 * 10**6
-    min_borrow_amount = 150 * 10**6
-    min_position_amount = 123
+    margin_amount = 150 * 10**6
+    min_borrow_amount = 1500 * 10**6
+    min_position_amount = 3 * 10**18
     vault.open_position(
         owner, weth, min_position_amount, usdc, min_borrow_amount, margin_amount
     )
@@ -156,9 +156,9 @@ def test_open_trade_swaps_liquidity_for_underlying(vault, owner, weth, usdc):
 def test_open_trade_reduces_free_margin_correctly(vault, owner, usdc, weth, alice):
     margin_before = vault.margin(owner, usdc)
 
-    margin_amount = 15 * 10**6
-    min_borrow_amount = 150 * 10**6
-    min_position_amount = 123
+    margin_amount = 150 * 10**6
+    min_borrow_amount = 1500 * 10**6
+    min_position_amount = 3 * 10**18
     vault.open_position(
         owner, weth, min_position_amount, usdc, min_borrow_amount, margin_amount
     )
@@ -172,9 +172,9 @@ def test_open_trade_reduces_free_margin_correctly(vault, owner, usdc, weth, alic
 def test_open_position_records_amount_lent_out_correctly(vault, owner, usdc, weth):
     debt_before = vault.total_debt_amount(usdc)
 
-    margin_amount = 15 * 10**6
-    min_borrow_amount = 150 * 10**6
-    min_position_amount = 123
+    margin_amount = 150 * 10**6
+    min_borrow_amount = 1500 * 10**6
+    min_position_amount = 3 * 10**18
     vault.open_position(
         owner, weth, min_position_amount, usdc, min_borrow_amount, margin_amount
     )
@@ -204,7 +204,7 @@ def test_cannot_open_trade_with_higher_than_max_leverage(vault, owner, weth, usd
     min_borrow_amount = margin_amount * max_leverage + 1
     min_position_amount = 123
 
-    with boa.reverts("too much leverage"):
+    with boa.reverts("cannot open liquidatable position"):
         vault.open_position(
             owner, weth, min_position_amount, usdc, min_borrow_amount, margin_amount
         )

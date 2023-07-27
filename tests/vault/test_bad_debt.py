@@ -13,7 +13,7 @@ def setup(vault, mock_router, owner, weth, usdc):
 def open_position(vault, owner, weth, usdc):
     margin_amount = 15 * 10**6
     usdc_in = 150 * 10**6
-    min_weth_out = 123
+    min_weth_out = 1 * 10**18
 
     uid, amount_bought = vault.open_position(
         owner,  # account
@@ -28,7 +28,7 @@ def open_position(vault, owner, weth, usdc):
 
 
 def test_repay_bad_debt_001(vault, usdc, weth, owner):
-    """when bad-debt is repayd it should be reduced in the vault,
+    """when bad-debt is repaid it should be reduced in the vault,
     the available-liquidity should go up correspondentingly"""
     bad_debt_before = vault.bad_debt(usdc)
     position_uid, _ = open_position(vault, owner, weth, usdc)
@@ -36,14 +36,14 @@ def test_repay_bad_debt_001(vault, usdc, weth, owner):
     assert bad_debt_before == 0
 
     vault.positions(position_uid)
-    vault.close_position(position_uid, 0)  # 0 out
+    vault.internal._close_position(position_uid, 1)  # 1 wei out
     bad_debt_after = vault.bad_debt(usdc)
 
-    assert bad_debt_after == 150 * 10**6
-    assert vault.available_liquidity(usdc) == 999700000000
+    assert bad_debt_after == 150 * 10**6 - 1
+    assert vault.available_liquidity(usdc) == 999700000002
 
-    vault.repay_bad_debt(usdc, 150 * 10**6)
+    vault.repay_bad_debt(usdc, bad_debt_after)
     bad_debt_after_repaying = vault.bad_debt(usdc)
     assert bad_debt_after_repaying == 0
 
-    assert vault.available_liquidity(usdc) == 999700000000 + 150 * 10**6
+    assert vault.available_liquidity(usdc) == 999700000002 + bad_debt_after 

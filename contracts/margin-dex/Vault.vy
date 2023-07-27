@@ -173,8 +173,7 @@ def open_position(
     assert self.is_whitelisted_dex[msg.sender], "unauthorized"
     assert self.is_enabled_market[_debt_token][_position_token], "market not enabled"
     assert self.margin[_account][_debt_token] >= _margin_amount, "not enough margin"
-    assert ((_debt_amount + _margin_amount) * PRECISION / _margin_amount) <= self.max_leverage[_debt_token][_position_token] * PRECISION, "too much leverage"
-    assert (self._available_liquidity(_debt_token) >= _debt_amount), "insufficient liquidity"
+    assert self._available_liquidity(_debt_token) >= _debt_amount, "insufficient liquidity"
 
     self.margin[_account][_debt_token] -= _margin_amount
     debt_shares: uint256 = self._borrow(_debt_token, _debt_amount)
@@ -205,6 +204,8 @@ def open_position(
     self.margin[_account][_debt_token] -= fee
     self._distribute_trading_fee(_debt_token, fee)
 
+    assert not self._is_liquidatable(position_uid), "cannot open liquidatable position"
+    
     log PositionOpened(_account, position)
 
     return position_uid, amount_bought
@@ -227,6 +228,7 @@ event BadDebt:
 @external
 def close_position(_position_uid: bytes32, _min_amount_out: uint256) -> uint256:
     assert self.is_whitelisted_dex[msg.sender], "unauthorized"
+    assert _min_amount_out >= self._debt(_position_uid), "invalid min_amount_out"
     return self._close_position(_position_uid, _min_amount_out)
 
 
@@ -335,6 +337,8 @@ def reduce_position(
     position.position_amount -= _reduce_by_amount
 
     self.positions[_position_uid] = position
+
+    assert not self._is_liquidatable(_position_uid), "cannot reduce into liquidation"
 
     log PositionReduced(position.account, _position_uid, position, amount_out_received)
 
