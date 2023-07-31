@@ -348,7 +348,7 @@ def reduce_position(
 event PositionLiquidated:
     account: indexed(address)
     uid: bytes32
-    positon: Position
+    position: Position
 
 @nonreentrant("lock")
 @external
