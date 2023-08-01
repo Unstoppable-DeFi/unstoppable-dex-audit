@@ -32,7 +32,7 @@ def test_first_provide_liquidity_records_user_shares(vault, usdc, owner):
 
     after = vault.base_lp_shares(usdc, owner)
 
-    assert after == before + amount * 10**18
+    assert after == before + amount * 10**18 - 1
 
 
 def test_first_provide_liquidity_records_total_shares(vault, usdc, owner):
@@ -43,7 +43,7 @@ def test_first_provide_liquidity_records_total_shares(vault, usdc, owner):
 
     after = vault.base_lp_total_shares(usdc)
 
-    assert after == before + amount * 10**18
+    assert after == before + amount * 10**18 - 1
 
 
 def test_multiple_provide_record_shares_correctly(vault, usdc, owner, alice):
@@ -53,16 +53,16 @@ def test_multiple_provide_record_shares_correctly(vault, usdc, owner, alice):
 
     amount = 100 * 10**6
     vault.provide_liquidity(usdc, amount, BASE_LP)
-    assert vault.base_lp_total_shares(usdc) == before_total_shares + amount * 10**18
-    assert vault.base_lp_shares(usdc, owner) == before_owner_shares + amount * 10**18
+    assert vault.base_lp_total_shares(usdc) == before_total_shares + amount * 10**18 - 1
+    assert vault.base_lp_shares(usdc, owner) == before_owner_shares + amount * 10**18 - 1
 
     with boa.env.prank(alice):
         amount_2 = 30 * 10**6
         vault.provide_liquidity(usdc, amount_2, BASE_LP)
 
-    assert vault.base_lp_total_shares(usdc) == before_total_shares + (amount + amount_2) * 10**18
-    assert vault.base_lp_shares(usdc, owner) == before_owner_shares + amount * 10**18
-    assert vault.base_lp_shares(usdc, alice) == before_alice_shares + amount_2 * 10**18
+    assert vault.base_lp_total_shares(usdc) == before_total_shares + (amount + amount_2) * 10**18 - 1 - 1
+    assert vault.base_lp_shares(usdc, owner) == before_owner_shares + amount * 10**18 - 1
+    assert vault.base_lp_shares(usdc, alice) == before_alice_shares + amount_2 * 10**18 - 1
 
 
 def test_shares_to_amount_are_calculated_correctly(vault, usdc):
@@ -172,8 +172,8 @@ def test_cannot_withdraw_more_than_you_own(vault, usdc, owner, alice):
 
     alice_shares = vault.base_lp_shares(usdc, alice)
     alice_amount = vault.lp_shares_to_amount(usdc, alice_shares, BASE_LP)
-    assert alice_amount == amount
-    assert alice_shares == amount * 10**18
+    assert alice_amount == amount - 1
+    assert alice_shares == amount * 10**18 - 1
 
     with boa.env.prank(alice):
         with boa.reverts("cannot withdraw more than you own"):
@@ -204,13 +204,13 @@ def test_withdraw_liquidity_transfers_tokens(vault, usdc, owner):
     vault_balance_before = usdc.balanceOf(vault)
     assert vault_balance_before >= amount
 
-    vault.withdraw_liquidity(usdc, amount, BASE_LP)
+    vault.withdraw_liquidity(usdc, amount - 1, BASE_LP)
 
     owner_balance_after = usdc.balanceOf(owner)
     vault_balance_after = usdc.balanceOf(vault)
 
-    assert vault_balance_after == vault_balance_before - amount
-    assert owner_balance_after == owner_balance_before + amount
+    assert vault_balance_after == vault_balance_before - amount + 1
+    assert owner_balance_after == owner_balance_before + amount - 1
 
 
 def test_available_liquidty_is_calculated_correctly(vault, usdc):
@@ -274,6 +274,6 @@ def test_init_total_by_distributing_trading_fee_works(vault, usdc, owner):
 
     after = vault.base_lp_shares(usdc, owner)
 
-    assert after == before + amount * 10**18
+    assert after == before + amount * 10**18 - 1
 
-    assert vault.lp_shares_to_amount(usdc, after, BASE_LP) == 100 * 10**6 + 400000
+    assert vault.lp_shares_to_amount(usdc, after, BASE_LP) == 100 * 10**6 + 400000 - 1

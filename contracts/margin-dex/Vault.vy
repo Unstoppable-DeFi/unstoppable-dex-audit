@@ -816,7 +816,8 @@ def _account_for_provide_liquidity(
     _token: address, _amount: uint256, _is_safety_module: bool
 ):
     self._update_debt(_token)
-    shares: uint256 = self._amount_to_lp_shares(_token, _amount, _is_safety_module)
+    # issue 1 less share to account for potential rounding errors later
+    shares: uint256 = self._amount_to_lp_shares(_token, _amount, _is_safety_module) - 1
     if _is_safety_module:
         self.safety_module_lp_total_shares[_token] += shares
         self.safety_module_lp_shares[_token][msg.sender] += shares
