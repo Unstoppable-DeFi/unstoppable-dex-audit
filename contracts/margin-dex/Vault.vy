@@ -259,11 +259,12 @@ def _close_position(_position_uid: bytes32, _min_amount_out: uint256) -> uint256
         min_amount_out,
     )
 
+    self._repay(position.debt_token, position_debt_amount)
+
     if amount_out_received >= position_debt_amount:
         # all good, LPs are paid back, remainder goes back to trader
         trader_pnl: uint256 = amount_out_received - position_debt_amount
         self.margin[position.account][position.debt_token] += trader_pnl
-        self._repay(position.debt_token, position_debt_amount)
     else:
         # edge case: bad debt
         bad_debt: uint256 = position_debt_amount - amount_out_received
@@ -272,9 +273,6 @@ def _close_position(_position_uid: bytes32, _min_amount_out: uint256) -> uint256
         if self.bad_debt[position.debt_token] > self.acceptable_amount_of_bad_debt[position.debt_token]:
             self.is_accepting_new_orders = False  # put protocol in defensive mode
 
-        self._repay(
-            position.debt_token, amount_out_received
-        )  # repay LPs as much as possible
         log BadDebt(position.debt_token, bad_debt, position.uid)
 
     # cleanup position

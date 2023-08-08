@@ -30,7 +30,7 @@ def open_position(vault, owner, weth, usdc):
 def test_repay_bad_debt_001(vault, usdc, weth, owner):
     """when bad-debt is repaid it should be reduced in the vault,
     the available-liquidity should go up correspondentingly"""
-    bad_debt_before = vault.bad_debt(usdc)
+    available_liquidity_before = vault.available_liquidity(usdc)
     position_uid, _ = open_position(vault, owner, weth, usdc)
     bad_debt_before = vault.bad_debt(usdc)
     assert bad_debt_before == 0
@@ -40,13 +40,13 @@ def test_repay_bad_debt_001(vault, usdc, weth, owner):
     bad_debt_after = vault.bad_debt(usdc)
 
     assert bad_debt_after == 150 * 10**6 - 1
-    assert vault.available_liquidity(usdc) == 999700000002
+    assert vault.available_liquidity(usdc) == available_liquidity_before - bad_debt_after
 
     vault.repay_bad_debt(usdc, bad_debt_after)
     bad_debt_after_repaying = vault.bad_debt(usdc)
     assert bad_debt_after_repaying == 0
 
-    assert vault.available_liquidity(usdc) == 999700000002 + bad_debt_after 
+    assert vault.available_liquidity(usdc) == available_liquidity_before
 
 
 def test_base_lp_is_impacted_by_bad_debt_if_safety_module_doesnt_cover_it_all(vault, usdc, weth, owner):
