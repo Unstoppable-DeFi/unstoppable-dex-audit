@@ -46,6 +46,14 @@ PRECISISON: constant(uint256) = 10**18
 
 UNISWAP_ROUTER: constant(address) = 0xE592427A0AEce92De3Edee1F18E0157C05861564
 
+WETH: constant(address) = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1
+USDC: constant(address) = 0xaf88d065e77c8cC2239327C5EDb3A432268e5831
+USDC_E: constant(address) = 0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8
+USDT: constant(address) = 0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9
+VALID_BASE_TOKENS: constant(address[4]) = [
+    WETH, USDC, USDC_E, USDT
+]
+
 TWAP: constant(address) = 0xFa64f316e627aD8360de2476aF0dD9250018CFc5 
 
 FEE_BASE: constant(uint256) = 1000000 # 100 percent
@@ -176,6 +184,9 @@ def execute_dca_order(_uid: bytes32, _uni_hop_path: DynArray[address, 3], _uni_p
     assert len(_uni_pool_fees) == len(_uni_hop_path)-1, "[path] invalid fees"
     assert _uni_hop_path[0] == order.token_in, "[path] invalid token_in"
     assert _uni_hop_path[len(_uni_hop_path)-1] == order.token_out, "[path] invalid token_out"
+
+    if len(_uni_hop_path) == 3:
+        assert _uni_hop_path[1] in VALID_BASE_TOKENS, "[path] invalid base token"
 
     # effects
     order.last_execution = block.timestamp
