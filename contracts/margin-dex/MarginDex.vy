@@ -579,8 +579,6 @@ def execute_limit_order(_uid: bytes32):
     limit_order: LimitOrder = self.limit_orders[_uid]
     assert limit_order.valid_until >= block.timestamp, "expired"
 
-    self.limit_orders[_uid] = empty(LimitOrder)
-    
     trade: Trade = self._open_trade(
         limit_order.account,
         limit_order.position_token,

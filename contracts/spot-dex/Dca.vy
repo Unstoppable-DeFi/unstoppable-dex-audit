@@ -46,6 +46,14 @@ PRECISISON: constant(uint256) = 10**18
 
 UNISWAP_ROUTER: constant(address) = 0xE592427A0AEce92De3Edee1F18E0157C05861564
 
+WETH: constant(address) = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1
+USDC: constant(address) = 0xaf88d065e77c8cC2239327C5EDb3A432268e5831
+USDC_E: constant(address) = 0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8
+USDT: constant(address) = 0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9
+VALID_BASE_TOKENS: constant(address[4]) = [
+    WETH, USDC, USDC_E, USDT
+]
+
 TWAP: constant(address) = 0xFa64f316e627aD8360de2476aF0dD9250018CFc5 
 
 FEE_BASE: constant(uint256) = 1000000 # 100 percent
@@ -177,6 +185,9 @@ def execute_dca_order(_uid: bytes32, _uni_hop_path: DynArray[address, 3], _uni_p
     assert _uni_hop_path[0] == order.token_in, "[path] invalid token_in"
     assert _uni_hop_path[len(_uni_hop_path)-1] == order.token_out, "[path] invalid token_out"
 
+    if len(_uni_hop_path) == 3:
+        assert _uni_hop_path[1] in VALID_BASE_TOKENS, "[path] invalid base token"
+
     # effects
     order.last_execution = block.timestamp
     order.number_of_executions += 1
@@ -197,11 +208,16 @@ def execute_dca_order(_uid: bytes32, _uni_hop_path: DynArray[address, 3], _uni_p
         self._cancel_dca_order(_uid, "insufficient allowance")
         return
 
+
+    balance_before: uint256 = ERC20(order.token_in).balanceOf(self)
+    
     # transfer token_in from user to self
     self._safe_transfer_from(order.token_in, order.account, self, order.amount_in_per_execution)
 
-    # approve UNISWAP_ROUTER to spend amount token_in
-    ERC20(order.token_in).approve(UNISWAP_ROUTER, order.amount_in_per_execution)
+    execution_amount: uint256 = ERC20(order.token_in).balanceOf(self) - balance_before
+
+    # approve UNISWAP_ROUTER to spend token_in
+    ERC20(order.token_in).approve(UNISWAP_ROUTER, execution_amount)
 
     # Vyper way to accommodate abi.encode_packed
     path: Bytes[66] = empty(Bytes[66])
@@ -210,13 +226,13 @@ def execute_dca_order(_uid: bytes32, _uni_hop_path: DynArray[address, 3], _uni_p
     elif(len(_uni_hop_path) == 3):
         path = concat(convert(_uni_hop_path[0], bytes20), convert(_uni_pool_fees[0], bytes3), convert(_uni_hop_path[1], bytes20), convert(_uni_pool_fees[1], bytes3), convert(_uni_hop_path[2], bytes20))
     
-    min_amount_out: uint256 = self._calc_min_amount_out(order.amount_in_per_execution, _uni_hop_path, _uni_pool_fees, order.twap_length, order.max_slippage)
+    min_amount_out: uint256 = self._calc_min_amount_out(execution_amount, _uni_hop_path, _uni_pool_fees, order.twap_length, order.max_slippage)
 
     uni_params: ExactInputParams = ExactInputParams({
         path: path,
         recipient: self,
         deadline: block.timestamp,
-        amountIn: order.amount_in_per_execution,
+        amountIn: execution_amount,
         amountOutMinimum: min_amount_out
     })
     amount_out: uint256 = UniswapV3SwapRouter(UNISWAP_ROUTER).exactInput(uni_params)

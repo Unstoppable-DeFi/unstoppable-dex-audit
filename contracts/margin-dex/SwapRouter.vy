@@ -128,7 +128,7 @@ def add_direct_route(_token1: address, _token2: address, _fee: uint24):
 
 
 @external
-def add_path(_token1: address, _token2: address, _path: Bytes[66]):
+def add_path(_token1: address, _token2: address, _path_t1_to_t2: Bytes[66], _path_t2_to_t1: Bytes[66]):
     assert msg.sender == self.admin, "unauthorized"
-    self.paths[_token1][_token2] = _path
-    self.paths[_token2][_token1] = _path
+    self.paths[_token1][_token2] = _path_t1_to_t2
+    self.paths[_token2][_token1] = _path_t2_to_t1

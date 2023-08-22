@@ -52,7 +52,6 @@ PERCENTAGE_BASE: constant(uint256) = 100_00 # == 100%
 PERCENTAGE_BASE_HIGH_PRECISION: constant(uint256) = 100_00_000  # == 100%
 
 ARBITRUM_SEQUENCER_UPTIME_FEED: constant(address) = 0xFdB631F5EE196F0ed6FAa767959853A9F217697D
-ORACLE_FRESHNESS_THRESHOLD: constant(uint256) = 24*60*60 # 24h
 
 WETH: constant(address) = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1
 
@@ -77,6 +76,7 @@ is_enabled_market: HashMap[address, HashMap[address, bool]]
 max_leverage: public(HashMap[address, HashMap[address, uint256]])
 # token -> Chainlink oracle
 to_usd_oracle: public(HashMap[address, address])
+oracle_freshness_threshold: public(HashMap[address, uint256])
 # token_in -> # token_out -> slippage
 liquidate_slippage: public(HashMap[address, HashMap[address, uint256]])
 
@@ -119,6 +119,7 @@ last_debt_update: public(HashMap[address, uint256])
 
 # token -> bad_debt
 bad_debt: public(HashMap[address, uint256])
+acceptable_amount_of_bad_debt: public(HashMap[address, uint256])
 
 # dynamic interest rates [min, mid, max, kink]
 interest_configuration: HashMap[address, uint256[4]]
@@ -172,8 +173,7 @@ def open_position(
     assert self.is_whitelisted_dex[msg.sender], "unauthorized"
     assert self.is_enabled_market[_debt_token][_position_token], "market not enabled"
     assert self.margin[_account][_debt_token] >= _margin_amount, "not enough margin"
-    assert ((_debt_amount + _margin_amount) * PRECISION / _margin_amount) <= self.max_leverage[_debt_token][_position_token] * PRECISION, "too much leverage"
-    assert (self._available_liquidity(_debt_token) >= _debt_amount), "insufficient liquidity"
+    assert self._available_liquidity(_debt_token) >= _debt_amount, "insufficient liquidity"
 
     self.margin[_account][_debt_token] -= _margin_amount
     debt_shares: uint256 = self._borrow(_debt_token, _debt_amount)
@@ -204,6 +204,8 @@ def open_position(
     self.margin[_account][_debt_token] -= fee
     self._distribute_trading_fee(_debt_token, fee)
 
+    assert not self._is_liquidatable(position_uid), "cannot open liquidatable position"
+    
     log PositionOpened(_account, position)
 
     return position_uid, amount_bought
@@ -226,6 +228,7 @@ event BadDebt:
 @external
 def close_position(_position_uid: bytes32, _min_amount_out: uint256) -> uint256:
     assert self.is_whitelisted_dex[msg.sender], "unauthorized"
+    assert _min_amount_out >= self._debt(_position_uid), "invalid min_amount_out"
     return self._close_position(_position_uid, _min_amount_out)
 
 
@@ -256,19 +259,20 @@ def _close_position(_position_uid: bytes32, _min_amount_out: uint256) -> uint256
         min_amount_out,
     )
 
+    self._repay(position.debt_token, position_debt_amount)
+
     if amount_out_received >= position_debt_amount:
         # all good, LPs are paid back, remainder goes back to trader
         trader_pnl: uint256 = amount_out_received - position_debt_amount
         self.margin[position.account][position.debt_token] += trader_pnl
-        self._repay(position.debt_token, position_debt_amount)
     else:
         # edge case: bad debt
-        self.is_accepting_new_orders = False  # put protocol in defensive mode
         bad_debt: uint256 = position_debt_amount - amount_out_received
         self.bad_debt[position.debt_token] += bad_debt
-        self._repay(
-            position.debt_token, amount_out_received
-        )  # repay LPs as much as possible
+        
+        if self.bad_debt[position.debt_token] > self.acceptable_amount_of_bad_debt[position.debt_token]:
+            self.is_accepting_new_orders = False  # put protocol in defensive mode
+
         log BadDebt(position.debt_token, bad_debt, position.uid)
 
     # cleanup position
@@ -307,11 +311,11 @@ def reduce_position(
     if min_amount_out == 0:
         # market order, add some slippage protection
         min_amount_out = self._market_order_min_amount_out(
-            position.position_token, position.debt_token, position.position_amount
+            position.position_token, position.debt_token, _reduce_by_amount
         )
 
     debt_amount: uint256 = self._debt(_position_uid)
-    margin_debt_ratio: uint256 = position.margin_amount * PRECISION / debt_amount
+    margin_debt_ratio: uint256 = position.margin_amount * PRECISION / (debt_amount + position.margin_amount)
 
     amount_out_received: uint256 = self._swap(
         position.position_token, position.debt_token, _reduce_by_amount, min_amount_out
@@ -324,12 +328,15 @@ def reduce_position(
     reduce_debt_by_amount: uint256 = amount_out_received - reduce_margin_by_amount
 
     position.margin_amount -= reduce_margin_by_amount
+    self.margin[position.account][position.debt_token] += reduce_margin_by_amount
 
     burnt_debt_shares: uint256 = self._repay(position.debt_token, reduce_debt_by_amount)
     position.debt_shares -= burnt_debt_shares
     position.position_amount -= _reduce_by_amount
 
     self.positions[_position_uid] = position
+
+    assert not self._is_liquidatable(_position_uid), "cannot reduce into liquidation"
 
     log PositionReduced(position.account, _position_uid, position, amount_out_received)
 
@@ -339,7 +346,7 @@ def reduce_position(
 event PositionLiquidated:
     account: indexed(address)
     uid: bytes32
-    positon: Position
+    position: Position
 
 @nonreentrant("lock")
 @external
@@ -351,9 +358,12 @@ def liquidate(_position_uid: bytes32):
         Charges the account a liquidation penalty.
     """
     assert self.is_whitelisted_dex[msg.sender], "unauthorized"
+    
+    position: Position = self.positions[_position_uid]
+    
+    self._update_debt(position.debt_token)
     assert self._is_liquidatable(_position_uid), "position not liquidateable"
 
-    position: Position = self.positions[_position_uid]
     debt_amount: uint256 = self._debt(_position_uid)
 
     min_amount_out: uint256 = self._market_order_min_amount_out(
@@ -455,15 +465,14 @@ def _effective_leverage(_position_uid: bytes32) -> uint256:
         position.position_token, position.position_amount
     )
     debt_value: uint256 = self._in_usd(position.debt_token, debt_amount)
-    margin_value: uint256 = self._in_usd(position.debt_token, position.margin_amount)
 
-    return self._calculate_leverage(position_value, debt_value, margin_value)
+    return self._calculate_leverage(position_value, debt_value)
 
 
 @view
 @internal
 def _calculate_leverage(
-    _position_value: uint256, _debt_value: uint256, _margin_value: uint256
+    _position_value: uint256, _debt_value: uint256
 ) -> uint256:
     if _position_value <= _debt_value:
         # bad debt
@@ -471,7 +480,7 @@ def _calculate_leverage(
 
     return (
         PRECISION
-        * (_debt_value + _margin_value)
+        * (_position_value)
         / (_position_value - _debt_value)
         / PRECISION
     )
@@ -533,6 +542,7 @@ def remove_margin(_position_uid: bytes32, _amount: uint256):
     """
     assert self.is_whitelisted_dex[msg.sender], "unauthorized"
 
+
     position: Position = self.positions[_position_uid]
 
     assert position.margin_amount >= _amount, "not enough margin"
@@ -540,6 +550,7 @@ def remove_margin(_position_uid: bytes32, _amount: uint256):
     position.margin_amount -= _amount
     self.margin[position.account][position.debt_token] += _amount
 
+    self._update_debt(position.debt_token)
     assert not self._is_liquidatable(_position_uid), "exceeds max leverage"
     
     self.positions[_position_uid] = position
@@ -577,7 +588,7 @@ def _to_usd_oracle_price(_token: address) -> uint256:
         self.to_usd_oracle[_token]
     ).latestRoundData()
 
-    assert (block.timestamp - updated_at) < ORACLE_FRESHNESS_THRESHOLD, "oracle not fresh"
+    assert (block.timestamp - updated_at) < self.oracle_freshness_threshold[self.to_usd_oracle[_token]], "oracle not fresh"
 
     usd_price: uint256 = convert(answer, uint256)  # 8 dec
     return usd_price
@@ -803,7 +814,8 @@ def _account_for_provide_liquidity(
     _token: address, _amount: uint256, _is_safety_module: bool
 ):
     self._update_debt(_token)
-    shares: uint256 = self._amount_to_lp_shares(_token, _amount, _is_safety_module)
+    # issue 1 less share to account for potential rounding errors later
+    shares: uint256 = self._amount_to_lp_shares(_token, _amount, _is_safety_module) - 1
     if _is_safety_module:
         self.safety_module_lp_total_shares[_token] += shares
         self.safety_module_lp_shares[_token][msg.sender] += shares
@@ -943,7 +955,7 @@ def _lp_shares_to_amount(
 @view
 def _amount_per_base_lp_share(_token: address) -> uint256:
     return (
-        self.base_lp_total_amount[_token]
+        self._base_lp_total_amount(_token)
         * PRECISION
         * PRECISION
         / self.base_lp_total_shares[_token]
@@ -959,6 +971,16 @@ def _amount_per_safety_module_lp_share(_token: address) -> uint256:
         * PRECISION
         / self.safety_module_lp_total_shares[_token]
     )
+
+
+@internal
+@view
+def _base_lp_total_amount(_token: address) -> uint256:
+    if self.bad_debt[_token] <= self.safety_module_lp_total_amount[_token]:
+        # safety module covers all bad debt, base lp is healthy
+        return self.base_lp_total_amount[_token]
+    # more bad debt than covered by safety module, base lp is impacted as well
+    return self.base_lp_total_amount[_token] + self.safety_module_lp_total_amount[_token] - self.bad_debt[_token]
 
 
 @internal
@@ -1055,14 +1077,15 @@ def _update_debt(_debt_token: address):
     if block.timestamp == self.last_debt_update[_debt_token]:
         return  # already up to date, nothing to do
 
-    self.last_debt_update[_debt_token] = block.timestamp
-    
     if self.total_debt_amount[_debt_token] == 0:
+        self.last_debt_update[_debt_token] = block.timestamp
         return # no debt, no interest
 
     self.total_debt_amount[_debt_token] += self._debt_interest_since_last_update(
         _debt_token
     )
+
+    self.last_debt_update[_debt_token] = block.timestamp
 
 @internal
 @view
@@ -1071,7 +1094,7 @@ def _debt_interest_since_last_update(_debt_token: address) -> uint256:
         (block.timestamp - self.last_debt_update[_debt_token])
         * self._current_interest_per_second(_debt_token)
         * self.total_debt_amount[_debt_token]
-        / PERCENTAGE_BASE
+        / PERCENTAGE_BASE_HIGH_PRECISION
         / PRECISION
     )
 
@@ -1475,12 +1498,17 @@ def set_is_accepting_new_orders(_is_accepting_new_orders: bool):
 # allowed tokens & markets
 #
 @external
-def whitelist_token(_token: address, _token_to_usd_oracle: address) -> uint256:
+def whitelist_token(
+    _token: address, 
+    _token_to_usd_oracle: address, 
+    _oracle_freshness_threshold: uint256) -> uint256:
     assert msg.sender == self.admin, "unauthorized"
     assert self.is_whitelisted_token[_token] == False, "already whitelisted"
+    assert _oracle_freshness_threshold > 0, "invalid oracle freshness threshold"
 
     self.is_whitelisted_token[_token] = True
     self.to_usd_oracle[_token] = _token_to_usd_oracle
+    self.oracle_freshness_threshold[_token_to_usd_oracle] = _oracle_freshness_threshold
 
     return self._to_usd_oracle_price(_token)
 
@@ -1515,6 +1543,12 @@ def set_liquidate_slippage_for_market(
 ):
     assert msg.sender == self.admin, "unauthorized"
     self.liquidate_slippage[_token1][_token2] = _slippage
+
+
+@external
+def set_acceptable_amount_of_bad_debt(_address: address, _amount: uint256):
+    assert msg.sender == self.admin, "unauthorized"
+    self.acceptable_amount_of_bad_debt[_address] = _amount
 
 
 #
@@ -1586,6 +1620,9 @@ def set_variable_interest_parameters(
     _rate_switch_utilization: uint256,
 ):
     assert msg.sender == self.admin, "unauthorized"
+
+    self._update_debt(_address)
+    
     self.interest_configuration[_address] = [
         _min_interest_rate,
         _mid_interest_rate,

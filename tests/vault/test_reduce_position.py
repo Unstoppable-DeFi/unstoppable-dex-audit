@@ -62,6 +62,30 @@ def test_reduce_position(vault, owner, weth, usdc, mock_router, eth_usd_oracle):
     assert position_amount_after == pytest.approx(int(1 * 10**18 / 3 * 2), 1000)
 
 
+def test_reduce_position_credits_user_margin(vault, owner, weth, usdc, mock_router, eth_usd_oracle):
+    eth_usd_oracle.set_answer(9300_00000000)
+    assert vault.swap_router() == mock_router.address
+
+    uid, amount_bought = vault.open_position(
+        owner,  # account
+        weth,  # position_token
+        1 * 10**18,  # min_position_amount_out
+        usdc,  # debt_token
+        9000 * 10**6,  # debt_amount
+        300 * 10**6,  # margin_amount
+    )
+
+    user_margin_before = vault.margin(owner, usdc)
+
+    # reduce by 1/3
+    vault.reduce_position(uid, int(1 * 10**18/3), 3100 * 10**6)
+    
+    user_margin_after = vault.margin(owner, usdc)
+
+    assert user_margin_after == pytest.approx(user_margin_before + 100 * 10**6)
+
+
+
 # def test_mock_swap_router(mock_router, usdc, weth, owner):
 #     before = weth.balanceOf(owner)
 

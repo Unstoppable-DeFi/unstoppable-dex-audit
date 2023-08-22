@@ -12,9 +12,9 @@ def setup(vault, mock_router, owner, weth, usdc):
 
 
 def open_position(vault, owner, weth, usdc):
-    margin_amount = 15 * 10**6
-    usdc_in = 150 * 10**6
-    min_weth_out = 123
+    margin_amount = 150 * 10**6
+    usdc_in = 1500 * 10**6
+    min_weth_out = 3 * 10**18
 
     uid, amount_bought = vault.open_position(
         owner,  # account
@@ -42,7 +42,7 @@ def test_close_position_reduces_position_to_zero(vault, owner, weth, usdc):
 
     assert position_before[6] > 0  # [6] = postion_amount
 
-    vault.close_position(position_uid, 150 * 10**6)
+    vault.close_position(position_uid, 1500 * 10**6)
     position_after = vault.positions(position_uid)
 
     assert position_after[6] == 0  # [6] = position_amount
@@ -53,8 +53,8 @@ def test_close_position_swaps_liquidity_for_underlying(vault, weth, usdc, owner)
     liquidity_before = usdc.balanceOf(vault)
     underlying_before = weth.balanceOf(vault)
 
-    weth_in = 123
-    min_usdc_out = 150 * 10**6
+    weth_in = 3 * 10**18
+    min_usdc_out = 1500 * 10**6
     vault.close_position(position_uid, min_usdc_out)
 
     liquidity_after = usdc.balanceOf(vault)
@@ -71,16 +71,16 @@ def test_close_position_in_profit_increases_margin(vault, weth, usdc, owner):
 
     position = vault.positions(position_uid)
     position_margin = position[3]
-    assert position_margin == 15 * 10**6
+    assert position_margin == 150 * 10**6
 
     min_usdc_out = (
-        250 * 10**6
+        1750 * 10**6
     )  # simulated profit of 100 in addition to initial (margin + borrowed)
     vault.close_position(position_uid, min_usdc_out)
 
     margin_after = vault.margin(owner, usdc)
 
-    expected_pnl = 85 * 10**6
+    expected_pnl = 100 * 10**6
     assert (
         margin_after == account_margin_after_trade_open + position_margin + expected_pnl
     )
@@ -93,9 +93,9 @@ def test_close_position_in_loss_reduces_margin(vault, usdc, weth, owner):
     position = vault.positions(position_uid)
     position_margin = position[3]
 
-    # position-supply = debt + margin = 150 + 15
+    # position-supply = debt + margin = 1500 + 150
     expected_loss = 10 * 10**6
-    min_usdc_out = 165 * 10**6 - expected_loss  # simulated loss of 10
+    min_usdc_out = 1650 * 10**6 - expected_loss  # simulated loss of 10
     vault.close_position(position_uid, min_usdc_out)
 
     margin_after = vault.margin(owner, usdc)
@@ -134,7 +134,7 @@ def test_reduce_position_partially_reduces_debt(vault, usdc, weth, owner):
     # we have a margin of 15 and a debt of 150, the margin to debt ratio is
     # 15/165 = 0.0909.. accordingly we are reducing the margin by 0.45
     # and the debt by 4.55
-    expected_debt_shares = 145500000000000000000000000
+    expected_debt_shares = 145454545000000000000000000
     assert debt_shares_after_reduce == expected_debt_shares
 
 
@@ -144,14 +144,14 @@ def test_close_position_in_bad_debt_records_bad_debt(vault, usdc, weth, owner):
     assert bad_debt_before == 0
 
     vault.positions(position_uid)
-    vault.close_position(position_uid, 0)  # 0 out
+    vault.internal._close_position(position_uid, 1)  # 1 wei out
     bad_debt_after = vault.bad_debt(usdc)
 
     # TODO ensure position-debt is here the correct value
     # we are minting new bad-debt shares and it is the first
     # position, thus all share-positions should now be bad-debt
-    # that means all the 150 that where borrowed are now bad debt
-    assert bad_debt_after == 150 * 10**6
+    # that means all the 1500 that where borrowed are now bad debt
+    assert bad_debt_after == 1500 * 10**6 - 1
 
 
 def test_close_position_in_bad_debt_deactivates_accepting_new_orders(
@@ -159,9 +159,10 @@ def test_close_position_in_bad_debt_deactivates_accepting_new_orders(
 ):
     position_uid, _ = open_position(vault, owner, weth, usdc)
     assert vault.is_accepting_new_orders()
+    assert vault.acceptable_amount_of_bad_debt(usdc) == 0
     vault.positions(position_uid)
 
-    vault.close_position(position_uid, 0)  # 0 out
+    vault.internal._close_position(position_uid, 1)  # 0 out
 
     bad_debt_after = vault.bad_debt(usdc)
 
