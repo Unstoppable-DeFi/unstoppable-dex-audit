@@ -248,8 +248,17 @@ def test_cannot_borrow_more_than_available_liqudity(vault, usdc):
 
 
 def test_init_total_by_distributing_trading_fee_works(vault, usdc, owner):
-    vault.set_trading_fee_lp_share(100_00)
-    vault.set_safety_module_interest_share_percentage(60_00)
+    trade_open_fee = vault.trade_open_fee()
+    penalty = vault.liquidation_penalty()
+    safety_module_interest_share_percentage = 60_00 # 60%
+    trading_fee_lp_share = 100_00 # 100%
+
+    vault.set_fee_configuration(
+        trade_open_fee,
+        penalty,
+        safety_module_interest_share_percentage,
+        trading_fee_lp_share
+    )
 
     vault.eval(f"self.base_lp_total_amount[{usdc.address}] = {0}")
     vault.eval(f"self.safety_module_lp_total_amount[{usdc.address}] = {0}")

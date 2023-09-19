@@ -80,8 +80,17 @@ def test_liquidate_005(vault, owner, alice, weth, usdc, eth_usd_oracle):
 
     margin_before = vault.margin(owner, usdc)
 
+    fee = vault.trade_open_fee()
+    safety_module_interest_share_percentage = vault.safety_module_interest_share_percentage()
+    trading_fee_lp_share = vault.trading_fee_lp_share()
+
     penalty = 1_00  # 1%
-    vault.set_liquidation_penalty(penalty)
+    vault.set_fee_configuration(
+        fee,
+        penalty,
+        safety_module_interest_share_percentage,
+        trading_fee_lp_share
+    )
 
     balance_penalty_receiver = usdc.balanceOf(
         "0x0000000000000000000000000000000000000066"
@@ -118,8 +127,19 @@ def test_liquidate_007(vault, owner, alice, weth, usdc, eth_usd_oracle):
     cover the the liquidation penalty the difference between the swap-back
     amount and the debt should be removed from the users margin"""
     margin_before = vault.margin(owner, usdc)
+
+    fee = vault.trade_open_fee()
+    safety_module_interest_share_percentage = vault.safety_module_interest_share_percentage()
+    trading_fee_lp_share = vault.trading_fee_lp_share()
+
     penalty = 1_00  # 1%
-    vault.set_liquidation_penalty(penalty)
+    vault.set_fee_configuration(
+        fee,
+        penalty,
+        safety_module_interest_share_percentage,
+        trading_fee_lp_share
+    )
+
     assert vault.liquidation_penalty() == penalty
     vault.set_liquidate_slippage_for_market(weth, usdc, 1_00)
 
@@ -155,8 +175,19 @@ def test_liquidate_008(vault, owner, alice, weth, usdc, eth_usd_oracle):
     """if the position is liquidated in bad debt nothing should be removed from
     the users margin"""
     margin_before = vault.margin(owner, usdc)
+    
+    fee = vault.trade_open_fee()
+    safety_module_interest_share_percentage = vault.safety_module_interest_share_percentage()
+    trading_fee_lp_share = vault.trading_fee_lp_share()
+
     penalty = 1_00  # 1%
-    vault.set_liquidation_penalty(penalty)
+    vault.set_fee_configuration(
+        fee,
+        penalty,
+        safety_module_interest_share_percentage,
+        trading_fee_lp_share
+    )
+
     assert vault.liquidation_penalty() == penalty
     vault.set_liquidate_slippage_for_market(weth, usdc, 1_00)
 
