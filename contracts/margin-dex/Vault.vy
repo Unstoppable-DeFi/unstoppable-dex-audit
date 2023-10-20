@@ -1299,21 +1299,6 @@ def _dynamic_interest_rate_high_utilization(
     return _additional_rate_through_utilization / PRECISION
 
 
-
-@internal
-@view
-def _interest_configuration(_address: address) -> uint256[4]:
-    if (
-        self.interest_configuration[_address][0] != 0
-        and self.interest_configuration[_address][1] != 0
-        and self.interest_configuration[_address][2] != 0
-        and self.interest_configuration[_address][3] != 0
-    ):
-        return FALLBACK_INTEREST_CONFIGURATION
-
-    return self.interest_configuration[_address]
-
-
 @internal
 @view
 def _min_interest_rate(_address: address) -> uint256:
@@ -1555,30 +1540,25 @@ def set_acceptable_amount_of_bad_debt(_address: address, _amount: uint256):
 # fees
 #
 @external
-def set_trade_open_fee(_fee: uint256):
+def set_fee_configuration(
+    _trading_fee: uint256,
+    _liquidation_penalty: uint256,
+    _trading_fee_safety_module_interest_share_percentage: uint256,
+    _trading_fee_lp_share_percentage: uint256
+):
     assert msg.sender == self.admin, "unauthorized"
-    self.trade_open_fee = _fee
 
+    assert _trading_fee <= PERCENTAGE_BASE, "cannot be more than 100%"
+    self.trade_open_fee = _trading_fee
 
-@external
-def set_liquidation_penalty(_penalty: uint256):
-    assert msg.sender == self.admin, "unauthorized"
-    assert _penalty <= PERCENTAGE_BASE, "cannot be more thann 100%"
-    self.liquidation_penalty = _penalty
+    assert _liquidation_penalty <= PERCENTAGE_BASE, "cannot be more than 100%"
+    self.liquidation_penalty = _liquidation_penalty
 
+    assert _trading_fee_safety_module_interest_share_percentage <= PERCENTAGE_BASE, "cannot be more than 100%"
+    self.safety_module_interest_share_percentage = _trading_fee_safety_module_interest_share_percentage
 
-@external
-def set_safety_module_interest_share_percentage(_percentage: uint256):
-    assert msg.sender == self.admin, "unauthorized"
-    assert _percentage <= PERCENTAGE_BASE, "cannot be more thann 100%"
-    self.safety_module_interest_share_percentage = _percentage
-
-
-@external
-def set_trading_fee_lp_share(_percentage: uint256):
-    assert msg.sender == self.admin, "unauthorized"
-    assert _percentage <= PERCENTAGE_BASE, "cannot be more thann 100%"
-    self.trading_fee_lp_share = _percentage
+    assert _trading_fee_lp_share_percentage <= PERCENTAGE_BASE, "cannot be more than 100%"
+    self.trading_fee_lp_share = _trading_fee_lp_share_percentage
 
 
 #

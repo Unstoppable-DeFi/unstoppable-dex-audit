@@ -212,7 +212,18 @@ def test_cannot_open_trade_with_higher_than_max_leverage(vault, owner, weth, usd
 def test_fee_is_charged(vault, owner, weth, usdc):
     margin_before = vault.margin(owner, usdc)
 
-    vault.set_trade_open_fee(10)
+    open_trade_fee = 10 # 0.10%
+    penalty = vault.liquidation_penalty()
+    safety_module_interest_share_percentage = vault.safety_module_interest_share_percentage()
+    trading_fee_lp_share = vault.trading_fee_lp_share()
+
+    vault.set_fee_configuration(
+        open_trade_fee,
+        penalty,
+        safety_module_interest_share_percentage,
+        trading_fee_lp_share
+    )
+
     assert vault.trade_open_fee() == 10 # 0.1%
 
     min_amount_out = 1 * 10**18
@@ -236,14 +247,21 @@ def test_fee_is_charged(vault, owner, weth, usdc):
 def test_fee_is_distributed(vault, owner, weth, usdc):
     available_liquidity_before = vault.available_liquidity(usdc)
 
-    vault.set_trade_open_fee(100)
-    assert vault.trade_open_fee() == 100 # 1%
+    open_trade_fee = 1_00 # 1%
+    penalty = vault.liquidation_penalty()
+    safety_module_interest_share_percentage = 60_00 # 60%
+    trading_fee_lp_share = 80_00 # 80%
 
-    vault.set_trading_fee_lp_share(80_00) # 80%
+    vault.set_fee_configuration(
+        open_trade_fee,
+        penalty,
+        safety_module_interest_share_percentage,
+        trading_fee_lp_share
+    )
+
+    assert vault.trade_open_fee() == 1_00 # 1%
     assert vault.trading_fee_lp_share() == 80_00
-
-    vault.set_safety_module_interest_share_percentage(6000)
-    assert vault.safety_module_interest_share_percentage() == 6000 # 60%
+    assert vault.safety_module_interest_share_percentage() == 60_00 # 60%
 
     min_amount_out = 1 * 10**18
     debt_amount = 1000 * 10**6
