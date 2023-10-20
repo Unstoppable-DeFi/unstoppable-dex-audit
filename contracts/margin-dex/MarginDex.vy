@@ -289,6 +289,17 @@ def get_all_open_trades(_account: address) -> DynArray[Trade, 1024]:
 
     return trades
 
+@view
+@external
+def get_all_open_limit_orders(_account: address) -> DynArray[LimitOrder, 1024]:
+    uids: DynArray[bytes32, 1024] = self.limit_order_uids[_account]
+    limit_orders: DynArray[LimitOrder, 1024] = empty(DynArray[LimitOrder, 1024])
+
+    for uid in uids:
+        limit_orders.append(self.limit_orders[uid])
+
+    return limit_orders
+
 
 @external
 def swap_margin(
@@ -368,6 +379,42 @@ def add_sl_order(_trade_uid: bytes32, _sl_order: StopLossOrder):
     log SlOrderAdded(_trade_uid, sl_order)
 
 
+event TpUpdated:
+    trade_uid: bytes32
+    tp: TakeProfitOrder
+
+@external
+def updpate_tp_order(_trade_uid: bytes32, _tp_index: uint256, _updated_order: TakeProfitOrder):
+    trade: Trade = self.open_trades[_trade_uid]
+    assert (trade.account == msg.sender) or self.is_delegate[trade.account][msg.sender], "unauthorized"
+    assert self.is_accepting_new_orders, "paused"
+
+    assert len(trade.tp_orders) > _tp_index, "invalid index"
+
+    trade.tp_orders[_tp_index] = _updated_order
+    
+    self.open_trades[_trade_uid] = trade   
+    log TpUpdated(_trade_uid, _updated_order) 
+
+
+event SlUpdated:
+    trade_uid: bytes32
+    sl: StopLossOrder
+
+@external
+def updpate_sl_order(_trade_uid: bytes32, _sl_index: uint256, _updated_order: StopLossOrder):
+    trade: Trade = self.open_trades[_trade_uid]
+    assert (trade.account == msg.sender) or self.is_delegate[trade.account][msg.sender], "unauthorized"
+    assert self.is_accepting_new_orders, "paused"
+
+    assert len(trade.sl_orders) > _sl_index, "invalid index"
+
+    trade.sl_orders[_sl_index] = _updated_order
+
+    self.open_trades[_trade_uid] = trade    
+    log SlUpdated(_trade_uid, _updated_order)
+
+
 event TpExecuted:
     trade_uid: bytes32
     reduce_by_amount: uint256
@@ -397,7 +444,7 @@ def execute_tp_order(_trade_uid: bytes32, _tp_order_index: uint8):
         trade.vault_position_uid
     )
     amount_out_received: uint256 = 0
-    if tp_order.reduce_by_amount == position_amount:
+    if tp_order.reduce_by_amount >= position_amount:
         amount_out_received = self._full_close(trade, tp_order.min_amount_out)
     else:
         amount_out_received = self._partial_close(
