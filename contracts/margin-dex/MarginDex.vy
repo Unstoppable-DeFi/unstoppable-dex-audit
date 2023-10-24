@@ -718,7 +718,10 @@ def liquidate(_trade_uid: bytes32):
         allowed leverage.
     """
     trade: Trade = self.open_trades[_trade_uid]
+    self.open_trades[_trade_uid] = empty(Trade)
+
     Vault(self.vault).liquidate(trade.vault_position_uid)
+    
     log Liquidation(trade.account, _trade_uid, trade)
 
 
