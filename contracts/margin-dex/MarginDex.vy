@@ -582,7 +582,7 @@ def post_limit_order(
     assert self.is_accepting_new_orders, "not accepting new orders"
     assert (_account == msg.sender) or self.is_delegate[_account][msg.sender], "unauthorized"
 
-    assert Vault(self.vault).is_enabled_market(_debt_token, _position_token)
+    assert Vault(self.vault).is_enabled_market(_debt_token, _position_token), "market not enabled"
     assert _margin_amount > 0, "invalid margin amount"
     assert _debt_amount > _margin_amount, "invalid debt amount"
 
