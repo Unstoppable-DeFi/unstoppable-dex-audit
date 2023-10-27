@@ -229,20 +229,25 @@ def _full_close(_trade: Trade, _min_amount_out: uint256) -> uint256:
         _trade.vault_position_uid, _min_amount_out
     )
 
-    # cleanup trade
-    self.open_trades[_trade.uid] = empty(Trade)
-    uids: DynArray[bytes32, 1024] = self.trades_by_account[_trade.account]
+    self._cleanup_trade(_trade.uid)
+
+    log TradeClosed(_trade.account, _trade.uid, _trade, amount_out_received)
+    return amount_out_received
+
+
+@internal
+def _cleanup_trade(_trade_uid: bytes32):
+    account: address = self.open_trades[_trade_uid].account
+    self.open_trades[_trade_uid] = empty(Trade)
+    uids: DynArray[bytes32, 1024] = self.trades_by_account[account]
     for i in range(1024):
-        if uids[i] == _trade.uid:
+        if uids[i] == _trade_uid:
             uids[i] = uids[len(uids) - 1]
             uids.pop()
             break
         if i == len(uids) - 1:
             raise
-    self.trades_by_account[_trade.account] = uids
-
-    log TradeClosed(_trade.account, _trade.uid, _trade, amount_out_received)
-    return amount_out_received
+    self.trades_by_account[account] = uids
 
 
 event TradeReduced:
@@ -384,7 +389,7 @@ event TpUpdated:
     tp: TakeProfitOrder
 
 @external
-def updpate_tp_order(_trade_uid: bytes32, _tp_index: uint256, _updated_order: TakeProfitOrder):
+def update_tp_order(_trade_uid: bytes32, _tp_index: uint256, _updated_order: TakeProfitOrder):
     trade: Trade = self.open_trades[_trade_uid]
     assert (trade.account == msg.sender) or self.is_delegate[trade.account][msg.sender], "unauthorized"
     assert self.is_accepting_new_orders, "paused"
@@ -718,7 +723,7 @@ def liquidate(_trade_uid: bytes32):
         allowed leverage.
     """
     trade: Trade = self.open_trades[_trade_uid]
-    self.open_trades[_trade_uid] = empty(Trade)
+    self._cleanup_trade(_trade_uid)
 
     Vault(self.vault).liquidate(trade.vault_position_uid)
     
