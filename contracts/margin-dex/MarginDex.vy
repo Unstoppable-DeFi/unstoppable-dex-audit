@@ -407,7 +407,7 @@ event SlUpdated:
     sl: StopLossOrder
 
 @external
-def updpate_sl_order(_trade_uid: bytes32, _sl_index: uint256, _updated_order: StopLossOrder):
+def update_sl_order(_trade_uid: bytes32, _sl_index: uint256, _updated_order: StopLossOrder):
     trade: Trade = self.open_trades[_trade_uid]
     assert (trade.account == msg.sender) or self.is_delegate[trade.account][msg.sender], "unauthorized"
     assert self.is_accepting_new_orders, "paused"
