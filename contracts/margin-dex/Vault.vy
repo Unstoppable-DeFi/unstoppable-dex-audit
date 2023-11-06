@@ -71,7 +71,7 @@ is_whitelisted_dex: public(HashMap[address, bool])
 # address -> address -> bool
 is_whitelisted_token: public(HashMap[address, bool])
 # token_in -> # token_out
-is_enabled_market: HashMap[address, HashMap[address, bool]]
+is_enabled_market: public(HashMap[address, HashMap[address, bool]])
 # token_in -> # token_out
 max_leverage: public(HashMap[address, HashMap[address, uint256]])
 # token -> Chainlink oracle
